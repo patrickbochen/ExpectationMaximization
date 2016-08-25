@@ -1,0 +1,92 @@
+// <- is an equal sign
+// matrix is 2d array
+// runif - random uniform function (# of randomly generated values, between 1-255)
+// nimage[i,] - only uses rows
+// # = comment
+// nimage = 2d array with all the images
+
+# function takes in a preprocessed image
+kmeans <- function(nimage)
+{
+  # store the current means in a 196x5 matrix
+  mean <- matrix(0,nrow=196, ncol = 5)
+  # store mean for next time step, with random initialization
+  nextmean <- matrix(runif(196*5, min = 1, max = 255),nrow=196, ncol = 5)
+  # counter to keep track of number of iterations run
+  counter <- 0
+  # convergence value, once below a certain threshold, stop iterating
+  convergence <- 1
+  while(convergence > .1)
+  {
+    print(counter)
+    # gamma matrix for each i,j index. 1 if the ith image belongs to the jth cluster. 0 otherwise.
+    gammaij <- matrix(0, nrow=29503, ncol = 5)
+    # update the mean
+    mean<-nextmean
+    # E-Step
+    for (i in 1:29503)
+    {
+      # defensive copy of current image
+      xi <- nimage[i,]
+      # initialize the minimum distance to a cluster to infinity
+      champmin <- Inf
+      # index of the closest cluster
+      closestj <- 0
+      # Find the closest cluster
+      for (j in 1:5)
+      {   
+        # euclidian distance between cluster mean and image
+        dist <- eudist(xi, mean[,j])
+        # update current champion 
+        if (dist < champmin) 
+        {
+          champmin <- dist
+          closestj <- j
+
+        }
+        
+      }
+      # update gammaij matrix
+      gammaij[i,closestj] <- 1
+    }
+    # M-Step
+    for (j in 1:5)
+    {
+      # initialize the sum(gamma*x)
+      sumgammaijx <- array(0, dim = 196)
+      # initialize sum(gamma) to 1 to avoid problems when dividing by 0
+      sumgammaij <- 1
+      for (i in 1:29503)
+      {
+        sumgammaijx <- sumgammaijx + gammaij[i,j]*nimage[i,]
+        sumgammaij <- sumgammaij + gammaij[i,j]
+      }
+      # mean for the next time step
+      nextmean[,j] <- sumgammaijx / sumgammaij
+    }
+    # increment the counter
+    counter = counter + 1
+    # have we converged yet? Sum of the euclidian distance between the current means and the means for the next time step
+    convergence <- eudist(mean[,1],nextmean[,1])+eudist(mean[,2],nextmean[,2])+eudist(mean[,3],nextmean[,3])+eudist(mean[,4],nextmean[,4])+eudist(mean[,5],nextmean[,5])
+    print(convergence)
+  }
+  
+  # objective function calculation
+  sum = 0
+  # for every image and every potential cluster
+  for (i in 1:29503)
+  {
+    for (j in 1:5)
+    {
+      # if the image belongs to the cluster
+      if (gammaij[i,j] == 1)
+      {
+        # distance between the image and the mean of the cluster
+        dist = eudist(nimage[i,], nextmean[,j])
+        sum = sum + dist
+      }
+    }
+  }
+  print(sum)
+  return(new("Kmeans", mean = nextmean, gammaij = gammaij, objective = sum))
+}
